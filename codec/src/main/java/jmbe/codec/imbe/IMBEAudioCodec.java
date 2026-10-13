@@ -1,6 +1,4 @@
-package jmbe.codec.imbe;
-
-/*******************************************************************************
+/*
  * jmbe - Java MBE Library
  * Copyright (C) 2015 Dennis Sheirer
  *
@@ -11,26 +9,24 @@ package jmbe.codec.imbe;
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- ******************************************************************************/
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package jmbe.codec.imbe;
 
 import jmbe.audio.AudioWithoutMetadata;
-import jmbe.iface.IAudioCodec;
 import jmbe.iface.IAudioWithMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmbe.iface.IPayloadTransform;
+import jmbe.iface.IPayloadTransformAudioCodec;
 
-public class IMBEAudioCodec implements IAudioCodec
+public class IMBEAudioCodec implements IPayloadTransformAudioCodec
 {
-    private final static Logger mLog = LoggerFactory.getLogger(IMBEAudioCodec.class);
-
     public static final String CODEC_NAME = "IMBE";
-
     private IMBESynthesizer mSynthesizer;
+    private IPayloadTransform mPayloadTransform;
 
     public IMBEAudioCodec()
     {
@@ -38,41 +34,35 @@ public class IMBEAudioCodec implements IAudioCodec
     }
 
     @Override
-    public void reset()
+    public void setPayloadTransform(IPayloadTransform transform)
     {
-        mSynthesizer.reset();
+        mPayloadTransform = transform;
     }
 
-    /**
-     * Converts imbe frame data into PCM audio samples at 8kHz 16-bit rate
-     */
+    private IMBEFrame decodeFrame(byte[] frameData)
+    {
+        return mPayloadTransform == null ? new IMBEFrame(frameData) :
+            new PayloadTransformIMBEFrame(frameData, mPayloadTransform);
+    }
+
     public float[] getAudio(byte[] frameData)
     {
-        IMBEFrame frame = new IMBEFrame(frameData);
-        return mSynthesizer.getAudio(frame);
+        return mSynthesizer.getAudio(decodeFrame(frameData));
     }
 
-    /**
-     * Converts imbe frame data into PCM audio samples at 8kHz 16-bit rate
-     *
-     * Note: this method is for compatibility with the AMBE synthesizer and does not return any metadata.
-     *
-     * @param frameData byte array for an audio frame
-     * @return audio with empty metadata.
-     */
     @Override
     public IAudioWithMetadata getAudioWithMetadata(byte[] frameData)
     {
-        IMBEFrame frame = new IMBEFrame(frameData);
-        return AudioWithoutMetadata.create(mSynthesizer.getAudio(frame));
+        return AudioWithoutMetadata.create(mSynthesizer.getAudio(decodeFrame(frameData)));
     }
 
-    /**
-     * CODEC Name
-     */
     @Override
-    public String getCodecName()
+    public void reset()
     {
-        return CODEC_NAME;
+        mPayloadTransform = null;
+        mSynthesizer.reset();
     }
+
+    @Override
+    public String getCodecName() { return CODEC_NAME; }
 }
