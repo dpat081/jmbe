@@ -36,3 +36,50 @@ jar {
         }
     }
 }
+
+// Host supplies the original API and existing synthesis dependencies.
+// Only the two optional interfaces are added to this development artifact.
+ def payloadHookJarTask = tasks.register('payloadHookJar', Jar) {
+    group = 'build'
+    description = 'Builds a separate payload-hook development JAR for sdrtrunk.'
+    dependsOn tasks.named('classes'), project(':api').tasks.named('classes')
+    archiveFileName.set('jmbe-1.0.9-payload-hook-dev.jar')
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    from sourceSets.main.output
+    from(project(':api').sourceSets.main.output) {
+        include 'jmbe/iface/IPayloadTransform.class'
+        include 'jmbe/iface/IPayloadTransformAudioCodec.class'
+    }
+    from rootProject.file('LICENSE')
+    manifest {
+        attributes('Implementation-Title': 'JMBE payload-hook development library',
+                'Version': '1.0.9-payload-hook-dev',
+                'Payload-Hook-Development': 'true',
+                'Site': 'https://github.com/dpat081/jmbe')
+    }
+}
+
+tasks.register('verifyPayloadHookJar') {
+    group = 'verification'
+    description = 'Checks required entries in the development JAR; does not test runtime loading.'
+    dependsOn payloadHookJarTask
+    doLast {
+        def artifact = payloadHookJarTask.get().archiveFile.get().asFile
+        def required = [
+            'jmbe/JMBEAudioLibrary.class',
+            'jmbe/iface/IPayloadTransform.class',
+            'jmbe/iface/IPayloadTransformAudioCodec.class',
+            'jmbe/codec/ambe/AMBEAudioCodec.class',
+            'jmbe/codec/imbe/IMBEAudioCodec.class',
+            'jmbe/codec/imbe/PayloadTransformIMBEFrame.class',
+            'LICENSE'
+        ]
+        new java.util.jar.JarFile(artifact).withCloseable { jarFile ->
+            required.each { entry ->
+                if(jarFile.getJarEntry(entry) == null)
+                    throw new GradleException('Missing development JAR entry: ' + entry)
+            }
+        }
+        println('Verified development JAR entries: ' + artifact)
+    }
+}
